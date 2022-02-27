@@ -1,6 +1,6 @@
 import { RewriteFrames } from "@sentry/integrations";
 import * as Sentry from "@sentry/node";
-import { Client } from "discord.js";
+import { Client, WebhookClient } from "discord.js";
 
 import { CommandList } from "./commands/CommandList";
 import { IntentOptions } from "./config/IntentOptions";
@@ -24,6 +24,8 @@ Sentry.init({
 (async () => {
   const BOT = new Client({ intents: IntentOptions });
 
+  const hook = new WebhookClient({ url: process.env.DEBUG_HOOK as string });
+
   const hasEnv = validateEnv();
   if (!hasEnv) {
     logHandler.log("error", "Missing required environment variables.");
@@ -34,11 +36,20 @@ Sentry.init({
 
   BOT.on("ready", async () => {
     logHandler.log("debug", "Connected to Discord!");
+    await hook.send("Inspiration Bot is now online!");
     await registerCommands();
     const schedules = await InspirationModel.find({});
     for (const schedule of schedules) {
       await scheduleInspiration(schedule, BOT);
     }
+  });
+
+  BOT.on("guildCreate", async (guild) => {
+    await hook.send(`Joined guild ${guild.name} - ${guild.id}`);
+  });
+
+  BOT.on("guildDelete", async (guild) => {
+    await hook.send(`Left guild ${guild.name} - ${guild.id}`);
   });
 
   BOT.on("interactionCreate", async (interaction) => {
